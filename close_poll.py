@@ -47,6 +47,9 @@ def main():
         print("주말이므로 종료하지 않습니다.")
         return
 
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
     poll_state = load_json(STATE_FILE, {
         "chat_id": "",
         "message_id": "",
