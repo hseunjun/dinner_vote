@@ -1,8 +1,7 @@
 import os
 import json
-import asyncio
+import requests
 from datetime import datetime, timezone, timedelta
-from telegram import Bot
 
 STATE_FILE = "state/poll_state.json"
 ANSWERS_FILE = "state/poll_answers.json"
@@ -24,11 +23,26 @@ def today_str():
 def is_weekday_kst():
     return datetime.now(KST).weekday() < 5
 
-async def stop_poll_async(bot, chat_id, message_id):
-    poll = await bot.stop_poll(chat_id=chat_id, message_id=message_id)
-    return poll
+def stop_telegram_poll(token, chat_id, message_id):
+    url = f"https://api.telegram.org/bot{token}/stopPoll"
+    data = {
+        "chat_id": chat_id,
+        "message_id": message_id
+    }
+    response = requests.post(url, data=data)
+    return response.json()
 
-async def main():
+def send_telegram_message(token, chat_id, text):
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    response = requests.post(url, data=data)
+    return response.json()
+
+def main():
     if not is_weekday_kst():
         print("주말이므로 종료하지 않습니다.")
         return
@@ -52,48 +66,58 @@ async def main():
         print("열려 있는 투표가 없습니다.")
         return
 
-    try:
-        poll = await stop_poll_async(bot, poll_state["chat_id"], poll_state["message_id"])
+    # Poll 종료
+    stop_result = stop_telegram_poll(token, poll_state["chat_id"], poll_state["message_id"])
 
-        answers_data = load_json(ANSWERS_FILE, {
-            "poll_id": "",
-            "date": "",
-            "answers": {}
-        })
+    if not stop_result.get("ok"):
+        print(f"투표 종료 실패: {stop_result}")
+        return
 
-        yes_names = []
-        no_names = []
+    poll = stop_result["result"]
 
-        for _, item in answers_data.get("answers", {}).items():
-            name = item.get("name", "이름없음")
-            answer = item.get("answer", "미응답")
+    # 응답 파일에서 이름 목록 읽기
+    answers_data = load_json(ANSWERS_FILE, {
+        "poll_id": "",
+        "date": "",
+        "answers": {}
+    })
 
-            if answer == "네":
-                yes_names.append(name)
-            elif answer == "아니요":
-                no_names.append(name)
+    yes_names = []
+    no_names = []
 
-        yes_names.sort()
-        no_names.sort()
+    for _, item in answers_data.get("answers", {}).items():
+        name = item.get("name", "이름없음")
+        answer = item.get("answer", "미응답")
 
-        result_text = (
-            "📊 오늘 저녁 식사 설문 결과\n\n"
-            f"• 식사 예정 ({len(yes_names)}명)\n" + "\n".join([f"  - {name}" for name in yes_names]) + "\n\n"
-            f"• 불참 ({len(no_names)}명)\n" + "\n".join([f"  - {name}" for name in no_names]) + "\n\n"
-            f"총 응답 인원: {len(yes_names) + len(no_names)}명"
-        )
+        if answer == "네":
+            yes_names.append(name)
+        elif answer == "아니요":
+            no_names.append(name)
 
-        await bot.send_message(
-            chat_id=poll_state["chat_id"],
-            text=result_text
-        )
+    yes_names.sort()
+    no_names.sort()
 
+    yes_text = "\n".join([f"• {name}" for name in yes_names]) if yes_names else "없음"
+    no_text = "\n".join([f"• {name}" for name in no_names]) if no_names else "없음"
+
+    result_text = f"""📊 오늘 저녁 식사 설문 결과
+
+<b>식사 예정 ({len(yes_names)}명)</b>
+{yes_text}
+
+<b>불참 ({len(no_names)}명)</b>
+{no_text}
+
+총 응답 인원: {len(yes_names) + len(no_names)}명"""
+
+    send_result = send_telegram_message(token, poll_state["chat_id"], result_text)
+
+    if send_result.get("ok"):
         poll_state["status"] = "closed"
         save_json(STATE_FILE, poll_state)
         print("투표 종료 및 결과 전송 완료")
-
-    except Exception as e:
-        print(f"오류 발생: {e}")
+    else:
+        print(f"결과 메시지 전송 실패: {send_result}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
