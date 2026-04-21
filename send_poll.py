@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 
@@ -17,7 +18,17 @@ def today_str():
 def is_weekday_kst():
     return datetime.now(KST).weekday() < 5
 
-def main():
+async def send_poll_async(bot, chat_id):
+    message = await bot.send_poll(
+        chat_id=chat_id,
+        question="🍽 오늘 저녁 식사 하실 분?",
+        options=["네", "아니요"],
+        is_anonymous=False,
+        allows_multiple_answers=False
+    )
+    return message
+
+async def main():
     if not is_weekday_kst():
         print("주말이므로 발송하지 않습니다.")
         return
@@ -27,31 +38,31 @@ def main():
 
     bot = Bot(token=token)
 
-    message = bot.send_poll(
-        chat_id=chat_id,
-        question="🍽 오늘 저녁 식사 하실 분?",
-        options=["네", "아니요"],
-        is_anonymous=False,
-        allows_multiple_answers=False
-    )
+    try:
+        message = await send_poll_async(bot, chat_id)
 
-    poll_state = {
-        "chat_id": str(chat_id),
-        "message_id": message.message_id,
-        "poll_id": message.poll.id,
-        "date": today_str(),
-        "status": "open"
-    }
+        poll_state = {
+            "chat_id": str(chat_id),
+            "message_id": message.message_id,
+            "poll_id": message.poll.id,
+            "date": today_str(),
+            "status": "open"
+        }
 
-    poll_answers = {
-        "poll_id": message.poll.id,
-        "date": today_str(),
-        "answers": {}
-    }
+        poll_answers = {
+            "poll_id": message.poll.id,
+            "date": today_str(),
+            "answers": {}
+        }
 
-    save_json(STATE_FILE, poll_state)
-    save_json(ANSWERS_FILE, poll_answers)
-    print("투표 발송 및 응답 파일 초기화 완료")
+        save_json(STATE_FILE, poll_state)
+        save_json(ANSWERS_FILE, poll_answers)
+        print("투표 발송 및 응답 파일 초기화 완료")
+        print(f"message_id: {message.message_id}")
+        print(f"poll_id: {message.poll.id}")
+
+    except Exception as e:
+        print(f"오류 발생: {e}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
