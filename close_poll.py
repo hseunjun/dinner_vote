@@ -48,7 +48,6 @@ def main():
         return
 
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
     poll_state = load_json(STATE_FILE, {
         "chat_id": "",
