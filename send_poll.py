@@ -1,8 +1,7 @@
 import os
 import json
-import asyncio
+import requests
 from datetime import datetime, timezone, timedelta
-from telegram import Bot
 
 STATE_FILE = "state/poll_state.json"
 ANSWERS_FILE = "state/poll_answers.json"
@@ -18,7 +17,19 @@ def today_str():
 def is_weekday_kst():
     return datetime.now(KST).weekday() < 5
 
-async def main():
+def send_telegram_poll(token, chat_id, question, options):
+    url = f"https://api.telegram.org/bot{token}/sendPoll"
+    data = {
+        "chat_id": chat_id,
+        "question": question,
+        "options": json.dumps(options),
+        "is_anonymous": "false",
+        "allows_multiple_answers": "false"
+    }
+    response = requests.post(url, data=data)
+    return response.json()
+
+def main():
     if not is_weekday_kst():
         print("주말이므로 발송하지 않습니다.")
         return
@@ -26,33 +37,34 @@ async def main():
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
-    bot = Bot(token=token)
+    question = "🍽 오늘 저녁 식사 하실 분?"
+    options = ["네", "아니요"]
 
-    message = await bot.send_poll(
-        chat_id=chat_id,
-        question="🍽 오늘 저녁 식사 하실 분?",
-        options=["네", "아니요"],
-        is_anonymous=False,
-        allows_multiple_answers=False
-    )
+    result = send_telegram_poll(token, chat_id, question, options)
 
-    poll_state = {
-        "chat_id": str(chat_id),
-        "message_id": message.message_id,
-        "poll_id": message.poll.id,
-        "date": today_str(),
-        "status": "open"
-    }
+    if result.get("ok"):
+        message_id = result["result"]["message_id"]
+        poll_id = result["result"]["poll"]["id"]
 
-    poll_answers = {
-        "poll_id": message.poll.id,
-        "date": today_str(),
-        "answers": {}
-    }
+        poll_state = {
+            "chat_id": str(chat_id),
+            "message_id": message_id,
+            "poll_id": poll_id,
+            "date": today_str(),
+            "status": "open"
+        }
 
-    save_json(STATE_FILE, poll_state)
-    save_json(ANSWERS_FILE, poll_answers)
-    print("투표 발송 및 응답 파일 초기화 완료")
+        poll_answers = {
+            "poll_id": poll_id,
+            "date": today_str(),
+            "answers": {}
+        }
+
+        save_json(STATE_FILE, poll_state)
+        save_json(ANSWERS_FILE, poll_answers)
+        print(f"투표 발송 완료 - message_id: {message_id}")
+    else:
+        print(f"발송 실패: {result}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
