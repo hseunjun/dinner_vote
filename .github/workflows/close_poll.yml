@@ -1,0 +1,38 @@
+name: Close Dinner Poll
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1-5"
+
+jobs:
+  close-poll:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Close poll and send result
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python close_poll.py
+
+      - name: Commit state files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/poll_state.json
+          git commit -m "Close daily poll state" || echo "No changes to commit"
+          git push
