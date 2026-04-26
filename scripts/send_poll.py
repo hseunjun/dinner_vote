@@ -8,6 +8,7 @@ ANSWERS_FILE = "state/poll_answers.json"
 KST = timezone(timedelta(hours=9))
 
 def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -22,11 +23,11 @@ def send_telegram_poll(token, chat_id, question, options):
     data = {
         "chat_id": chat_id,
         "question": question,
-        "options": json.dumps(options),
-        "is_anonymous": "false",
-        "allows_multiple_answers": "false"
+        "options": json.dumps(options, ensure_ascii=False),
+        "is_anonymous": False,
+        "allows_multiple_answers": False
     }
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=30)
     return response.json()
 
 def main():
@@ -64,7 +65,7 @@ def main():
         save_json(ANSWERS_FILE, poll_answers)
         print(f"투표 발송 완료 - message_id: {message_id}")
     else:
-        print(f"발송 실패: {result}")
+        raise RuntimeError(f"발송 실패: {result}")
 
 if __name__ == "__main__":
     main()
