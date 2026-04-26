@@ -1,16 +1,16 @@
-name: Send Dinner Poll
+name: Send Telegram Dinner Poll
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 6 * * 1-5"
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   send-poll:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout
@@ -22,18 +22,18 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install requests
 
       - name: Send poll
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python send_poll.py
+        run: python scripts/send_poll.py
 
       - name: Commit state files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state/poll_state.json state/poll_answers.json
-          git commit -m "Initialize daily poll state" || echo "No changes to commit"
+          git diff --cached --quiet || git commit -m "Update poll state"
           git push
