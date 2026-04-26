@@ -2,7 +2,7 @@ name: Send Telegram Dinner Poll
 
 on:
   schedule:
-    - cron: "0 7 * * 1-5"
+    - cron: "0 1 * * 1-4"
   workflow_dispatch:
 
 permissions:
