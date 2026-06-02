@@ -3,5 +3,6 @@
   "message_id": 61,
   "poll_id": "6122896125818045441",
   "date": "2026-06-02",
-  "status": "open"
+  "status": "closed",
+  "closed_at": "2026-06-02T18:59:48.496446+09:00"
 }
